@@ -1,0 +1,27 @@
+# Model files
+models/*.weights
+models/*.cfg
+
+# Output
+output/
+screenshots/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual env
+venv/
+.env/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
