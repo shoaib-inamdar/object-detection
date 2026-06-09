@@ -1,4 +1,4 @@
-"""Quick verification that detector works on known test images."""
+detector = ObjectDetector()
 import cv2
 import os
 import sys
@@ -25,7 +25,6 @@ for img_path in images:
     if frame is None:
         print(f"\nCannot read {img_path}")
         continue
-
     dets = detector.detect(frame)
     labels = [f"{d['label']}({d['confidence']:.2f})" for d in dets]
     unique = set(d["label"] for d in dets)

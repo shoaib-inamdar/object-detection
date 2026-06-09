@@ -1,19 +1,3 @@
-"""
-Comprehensive test suite for the Real-Time Object Detection project.
-Run with:  python -m pytest tests/test_detection.py -v
-
-Tests cover:
-    1. Configuration validation
-    2. Model file integrity
-    3. Detector initialization
-    4. Multi-class detection on known images
-    5. Confidence threshold behavior
-    6. NMS behavior
-    7. Drawing utilities
-    8. FPS tracker
-    9. Edge cases (empty frames, tiny frames, large frames)
-"""
-
 import os
 import sys
 import time
@@ -22,7 +6,6 @@ import cv2
 import numpy as np
 import pytest
 
-# Ensure project root is on path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
@@ -34,13 +17,8 @@ from voice import VoiceAnnouncer
 TEST_IMAGES_DIR = os.path.join(PROJECT_ROOT, "tests", "test_images")
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  Fixtures
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 @pytest.fixture(scope="module")
 def detector():
-    """Load the detector once for all tests (expensive operation)."""
     return ObjectDetector()
 
 
@@ -78,35 +56,26 @@ def kite_image():
 
 @pytest.fixture
 def blank_frame():
-    """A completely black frame."""
     return np.zeros((480, 640, 3), dtype=np.uint8)
 
 
 @pytest.fixture
 def noise_frame():
-    """A frame filled with random noise."""
     np.random.seed(123)
     return np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  1. Configuration Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class TestConfig:
     def test_confidence_threshold_range(self):
-        assert 0.0 < config.CONFIDENCE_THRESHOLD < 1.0, \
-            f"Confidence threshold {config.CONFIDENCE_THRESHOLD} must be between 0 and 1"
+        assert 0.0 < config.CONFIDENCE_THRESHOLD < 1.0
 
     def test_nms_threshold_range(self):
-        assert 0.0 < config.NMS_THRESHOLD < 1.0, \
-            f"NMS threshold {config.NMS_THRESHOLD} must be between 0 and 1"
+        assert 0.0 < config.NMS_THRESHOLD < 1.0
 
     def test_input_size_valid(self):
         w, h = config.INPUT_SIZE
-        assert w > 0 and h > 0, "INPUT_SIZE must be positive"
-        assert w % 32 == 0 and h % 32 == 0, \
-            "INPUT_SIZE dimensions must be multiples of 32 for YOLO"
+        assert w > 0 and h > 0
+        assert w % 32 == 0 and h % 32 == 0
 
     def test_paths_defined(self):
         assert config.YOLO_WEIGHTS is not None
@@ -114,44 +83,30 @@ class TestConfig:
         assert config.COCO_NAMES is not None
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  2. Model File Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class TestModelFiles:
     def test_weights_exist(self):
-        assert os.path.isfile(config.YOLO_WEIGHTS), \
-            f"Weights file not found: {config.YOLO_WEIGHTS}"
+        assert os.path.isfile(config.YOLO_WEIGHTS)
 
     def test_config_exist(self):
-        assert os.path.isfile(config.YOLO_CONFIG), \
-            f"Config file not found: {config.YOLO_CONFIG}"
+        assert os.path.isfile(config.YOLO_CONFIG)
 
     def test_names_exist(self):
-        assert os.path.isfile(config.COCO_NAMES), \
-            f"Names file not found: {config.COCO_NAMES}"
+        assert os.path.isfile(config.COCO_NAMES)
 
     def test_weights_not_empty(self):
         size = os.path.getsize(config.YOLO_WEIGHTS)
-        assert size > 1_000_000, \
-            f"Weights file too small ({size} bytes), may be corrupted"
+        assert size > 1_000_000
 
     def test_coco_names_has_80_classes(self):
         with open(config.COCO_NAMES, "r") as f:
             classes = [line.strip() for line in f if line.strip()]
-        assert len(classes) == 80, \
-            f"Expected 80 COCO classes, got {len(classes)}"
+        assert len(classes) == 80
 
     def test_coco_names_starts_with_person(self):
         with open(config.COCO_NAMES, "r") as f:
             first = f.readline().strip()
-        assert first == "person", \
-            f"First class should be 'person', got '{first}'"
+        assert first == "person"
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  3. Detector Initialization Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class TestDetectorInit:
     def test_detector_creates(self, detector):
@@ -170,106 +125,75 @@ class TestDetectorInit:
         assert detector.colors.shape == (80, 3)
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  4. Multi-Class Detection Tests (THE KEY FIX)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class TestMultiClassDetection:
-    """Verify the detector finds MULTIPLE object classes, not just 'person'."""
-
     def test_dog_image_detects_dog(self, detector, dog_image):
-        """dog.jpg should detect at least a dog."""
         dets = detector.detect(dog_image)
         labels = {d["label"] for d in dets}
-        assert "dog" in labels, \
-            f"Expected 'dog' in detections, got: {labels}"
+        assert "dog" in labels
 
     def test_dog_image_detects_multiple_classes(self, detector, dog_image):
-        """dog.jpg should detect dog AND other objects (bicycle, truck)."""
         dets = detector.detect(dog_image)
         labels = {d["label"] for d in dets}
-        assert len(labels) >= 2, \
-            f"Expected at least 2 different classes, got: {labels}"
+        assert len(labels) >= 2
 
     def test_dog_image_detects_bicycle_or_truck(self, detector, dog_image):
-        """dog.jpg should detect bicycle and/or truck in addition to dog."""
         dets = detector.detect(dog_image)
         labels = {d["label"] for d in dets}
         has_vehicle = "bicycle" in labels or "truck" in labels or "car" in labels
-        assert has_vehicle, \
-            f"Expected bicycle/truck/car in dog.jpg, got: {labels}"
+        assert has_vehicle
 
     def test_horses_image_detects_horses(self, detector, horses_image):
-        """horses.jpg should detect horse class."""
         dets = detector.detect(horses_image)
         labels = {d["label"] for d in dets}
         has_animal = "horse" in labels or "cow" in labels
-        assert has_animal, \
-            f"Expected horse/cow in horses.jpg, got: {labels}"
+        assert has_animal
 
     def test_person_image_detects_person_and_dog(self, detector, person_image):
-        """person.jpg should detect both person and dog."""
         dets = detector.detect(person_image)
         labels = {d["label"] for d in dets}
-        assert "person" in labels, f"Expected 'person', got: {labels}"
-        assert "dog" in labels, f"Expected 'dog', got: {labels}"
+        assert "person" in labels
+        assert "dog" in labels
 
     def test_kite_image_detects_kite(self, detector, kite_image):
-        """kite.jpg should detect kites."""
         dets = detector.detect(kite_image)
         labels = {d["label"] for d in dets}
-        assert "kite" in labels, \
-            f"Expected 'kite' in detections, got: {labels}"
+        assert "kite" in labels
 
     def test_kite_image_detects_person(self, detector, kite_image):
-        """kite.jpg should also detect people."""
         dets = detector.detect(kite_image)
         labels = {d["label"] for d in dets}
-        assert "person" in labels, \
-            f"Expected 'person' in kite.jpg, got: {labels}"
+        assert "person" in labels
 
-    def test_total_unique_classes_across_images(self, detector, dog_image,
-                                                 horses_image, person_image,
-                                                 kite_image):
-        """Across all test images, we should detect at least 5 different classes."""
+    def test_total_unique_classes_across_images(self, detector, dog_image, horses_image, person_image, kite_image):
         all_labels = set()
         for img in [dog_image, horses_image, person_image, kite_image]:
             dets = detector.detect(img)
             all_labels.update(d["label"] for d in dets)
-        assert len(all_labels) >= 5, \
-            f"Expected at least 5 unique classes across all images, got {len(all_labels)}: {all_labels}"
+        assert len(all_labels) >= 5
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  5. Detection Result Format Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class TestDetectionFormat:
     def test_detection_has_required_keys(self, detector, dog_image):
         dets = detector.detect(dog_image)
-        assert len(dets) > 0, "Expected at least one detection"
+        assert len(dets) > 0
         required_keys = {"class_id", "label", "confidence", "box", "color"}
         for det in dets:
-            assert required_keys.issubset(det.keys()), \
-                f"Detection missing keys: {required_keys - det.keys()}"
+            assert required_keys.issubset(det.keys())
 
     def test_confidence_in_valid_range(self, detector, dog_image):
         dets = detector.detect(dog_image)
         for det in dets:
-            assert 0.0 < det["confidence"] <= 1.0, \
-                f"Confidence {det['confidence']} out of range"
+            assert 0.0 < det["confidence"] <= 1.0
 
     def test_box_has_four_values(self, detector, dog_image):
         dets = detector.detect(dog_image)
         for det in dets:
-            assert len(det["box"]) == 4, \
-                f"Box should have 4 values, got {len(det['box'])}"
+            assert len(det["box"]) == 4
 
     def test_class_id_valid(self, detector, dog_image):
         dets = detector.detect(dog_image)
         for det in dets:
-            assert 0 <= det["class_id"] < 80, \
-                f"Class ID {det['class_id']} out of range [0, 80)"
+            assert 0 <= det["class_id"] < 80
 
     def test_color_is_bgr_tuple(self, detector, dog_image):
         dets = detector.detect(dog_image)
@@ -279,84 +203,58 @@ class TestDetectionFormat:
                 assert 0 <= c <= 255
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  6. Confidence Threshold Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class TestConfidenceThreshold:
     def test_higher_threshold_fewer_detections(self, detector, dog_image):
-        """Raising threshold should give equal or fewer detections."""
         original = config.CONFIDENCE_THRESHOLD
         try:
             config.CONFIDENCE_THRESHOLD = 0.25
             dets_low = detector.detect(dog_image)
-
             config.CONFIDENCE_THRESHOLD = 0.70
             dets_high = detector.detect(dog_image)
-
-            assert len(dets_high) <= len(dets_low), \
-                f"Higher threshold should give fewer detections: {len(dets_high)} vs {len(dets_low)}"
+            assert len(dets_high) <= len(dets_low)
         finally:
             config.CONFIDENCE_THRESHOLD = original
 
     def test_very_high_threshold_few_detections(self, detector, dog_image):
-        """At 0.95 threshold, very few or zero detections expected."""
         original = config.CONFIDENCE_THRESHOLD
         try:
             config.CONFIDENCE_THRESHOLD = 0.95
             dets = detector.detect(dog_image)
-            assert len(dets) <= 2, \
-                f"At 0.95 threshold expected <=2 detections, got {len(dets)}"
+            assert len(dets) <= 2
         finally:
             config.CONFIDENCE_THRESHOLD = original
 
     def test_low_threshold_more_classes(self, detector, dog_image):
-        """At 0.15 threshold, should detect more classes than at 0.60."""
         original = config.CONFIDENCE_THRESHOLD
         try:
             config.CONFIDENCE_THRESHOLD = 0.15
             labels_low = {d["label"] for d in detector.detect(dog_image)}
-
             config.CONFIDENCE_THRESHOLD = 0.60
             labels_high = {d["label"] for d in detector.detect(dog_image)}
-
-            assert len(labels_low) >= len(labels_high), \
-                f"Lower threshold should give more classes: {labels_low} vs {labels_high}"
+            assert len(labels_low) >= len(labels_high)
         finally:
             config.CONFIDENCE_THRESHOLD = original
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  7. Edge Case Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class TestEdgeCases:
     def test_blank_frame_no_crash(self, detector, blank_frame):
-        """A completely black frame should not crash, just return 0 or few detections."""
         dets = detector.detect(blank_frame)
         assert isinstance(dets, list)
 
     def test_noise_frame_no_crash(self, detector, noise_frame):
-        """A random noise frame should not crash."""
         dets = detector.detect(noise_frame)
         assert isinstance(dets, list)
 
     def test_tiny_frame(self, detector):
-        """A very small frame (32x32) should not crash."""
         tiny = np.zeros((32, 32, 3), dtype=np.uint8)
         dets = detector.detect(tiny)
         assert isinstance(dets, list)
 
     def test_large_frame(self, detector):
-        """A large frame (1920x1080) should work fine."""
         large = np.zeros((1080, 1920, 3), dtype=np.uint8)
         dets = detector.detect(large)
         assert isinstance(dets, list)
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  8. FPS Tracker Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class TestFPSTracker:
     def test_initial_fps_is_zero_or_positive(self):
@@ -374,23 +272,15 @@ class TestFPSTracker:
         tracker = FPSTracker(avg_window=5)
         for _ in range(50):
             tracker.update()
-            time.sleep(0.05)  # ~20 FPS
-        # Should be in a broad reasonable range (EMA may drift)
-        assert 5.0 < tracker.fps < 100.0, \
-            f"FPS should be positive and reasonable, got {tracker.fps}"
+            time.sleep(0.05)
+        assert 5.0 < tracker.fps < 100.0
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  9. Drawing Utility Tests
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class TestDrawing:
     def _make_sample_detections(self):
         return [
-            {"class_id": 0, "label": "person", "confidence": 0.95,
-             "box": [100, 50, 200, 300], "color": (0, 255, 0)},
-            {"class_id": 16, "label": "dog", "confidence": 0.87,
-             "box": [300, 200, 150, 120], "color": (255, 0, 0)},
+            {"class_id": 0, "label": "person", "confidence": 0.95, "box": [100, 50, 200, 300], "color": (0, 255, 0)},
+            {"class_id": 16, "label": "dog", "confidence": 0.87, "box": [300, 200, 150, 120], "color": (255, 0, 0)},
         ]
 
     def test_draw_detections_returns_frame(self):

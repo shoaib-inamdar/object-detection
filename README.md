@@ -186,7 +186,7 @@ object detection/
 ### Step 1: Open a terminal in the project folder
 
 ```bash
-cd "C:\Users\HP\Desktop\object detection"
+cd "C:\Users\HP\Documents\object detection"
 ```
 
 ### Step 2: Create a virtual environment
@@ -213,8 +213,10 @@ You should see `(venv)` at the start of your terminal prompt.
 
 ### Step 4: Install the required packages
 
-```bash
-pip install -r requirements.txt
+Use the virtual environment Python directly so you do not depend on a stale `pip.exe` launcher:
+
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 This installs:
@@ -235,9 +237,23 @@ This downloads 3 files (~23 MB total) into the `models/` folder:
 
 ### Step 6: Run the detector!
 
-```bash
-python main.py
+```powershell
+.\venv\Scripts\python.exe main.py
 ```
+
+If you prefer `python main.py`, make sure the virtual environment is activated first.
+
+---
+
+## Troubleshooting
+
+### `import cv2` or `import numpy` fails on start
+
+This usually means the project was started with the system Python instead of the virtual environment. Activate `venv` or run the project with `.\venv\Scripts\python.exe main.py`.
+
+### `pip.exe` says it cannot find the launcher path
+
+Use `.\venv\Scripts\python.exe -m pip ...` instead of `pip.exe`. That bypasses the broken launcher and uses the correct interpreter.
 
 A window will open showing your webcam feed with detected objects highlighted.
 

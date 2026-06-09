@@ -1,14 +1,6 @@
-"""
-Download YOLOv4-tiny model files required for object detection.
-Run this script once before starting the detector.
-
-    python download_models.py
-"""
-
 import os
 import sys
 import urllib.request
-import hashlib
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
@@ -16,7 +8,7 @@ FILES = {
     "yolov4-tiny.weights": {
         "url": "https://github.com/AlexeyAB/darknet/releases/download/yolov4/yolov4-tiny.weights",
         "size_mb": 23.1,
-        "md5": None,  # Optional integrity check
+        "md5": None,
     },
     "yolov4-tiny.cfg": {
         "url": "https://raw.githubusercontent.com/AlexeyAB/darknet/master/cfg/yolov4-tiny.cfg",
@@ -32,7 +24,6 @@ FILES = {
 
 
 def _progress_hook(block_num, block_size, total_size):
-    """Display download progress."""
     downloaded = block_num * block_size
     if total_size > 0:
         pct = min(downloaded / total_size * 100, 100)
@@ -49,12 +40,11 @@ def _progress_hook(block_num, block_size, total_size):
 
 
 def download_file(url, dest_path):
-    """Download a file with progress display."""
     print(f"\n  URL : {url}")
     print(f"  Dest: {dest_path}")
     try:
         urllib.request.urlretrieve(url, dest_path, reporthook=_progress_hook)
-        print()  # newline after progress bar
+        print()
         return True
     except Exception as e:
         print(f"\n  [ERROR] Download failed: {e}")
@@ -63,30 +53,24 @@ def download_file(url, dest_path):
 
 def main():
     os.makedirs(MODEL_DIR, exist_ok=True)
-
     print("=" * 60)
     print("  YOLOv4-tiny Model Downloader")
     print("=" * 60)
-
     all_ok = True
     for filename, info in FILES.items():
         dest = os.path.join(MODEL_DIR, filename)
-
         if os.path.isfile(dest):
             size_mb = os.path.getsize(dest) / (1024 * 1024)
             print(f"\n[SKIP] {filename} already exists ({size_mb:.2f} MB)")
             continue
-
         print(f"\n[DOWNLOAD] {filename} (~{info['size_mb']:.1f} MB)")
         success = download_file(info["url"], dest)
-
         if success and os.path.isfile(dest):
             size_mb = os.path.getsize(dest) / (1024 * 1024)
             print(f"  [OK] Saved {filename} ({size_mb:.2f} MB)")
         else:
             print(f"  [FAIL] Could not download {filename}")
             all_ok = False
-
     print("\n" + "=" * 60)
     if all_ok:
         print("  All model files are ready!")
